@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Coordinates boilerplate example</title>
+    <style>
+      body, html{
+        background: #333;
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+    
+  import * as Coordinates from 
+  //"./coordinates.js"
+  "https://boss.veriler.com/coordinates.js?3"
+    
+      var rendererOptions = {
+        ambientLight: 1,
+        fov: 1500
+      }
+      var renderer = await Coordinates.Renderer(rendererOptions)
+
+      var S = Math.sin
+      var C = Math.cos
+      var Rn = Math.random
+      
+      Coordinates.AnimationLoop(renderer, 'Draw')
+
+      var shaderOptions = [
+        { uniform: {
+          type: 'phong',
+          value: 0
+        } }
+      ]
+      var shader = await Coordinates.BasicShader(renderer, shaderOptions)
+
+      var mapTexture = 'https://bosstools.mooo.com/assets/uploads/1sZamK.jpeg'
+
+      var shapes = []
+      
+      var mapSubshape, mapUvs
+      const loadMap = async map => {
+        var geoOptions = {
+          shapeType: 'rectangle',
+          canvasTexture:  map,
+          size: 10,
+          subs: 2,
+          scaleX: 16/9,
+          scaleY: -1,
+          colorMix: 0,
+        }
+        await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
+          mapSubshape = geometry
+          mapUvs = structuredClone(geometry.uvs)
+          await shader.ConnectGeometry(geometry)
+        })
+      }
+      
+      var fcl = 5
+      var frw = 1
+      var fbr = 5
+      var fsp = 4990 * 2
+      
+      var mapTileLines
+      var mapTileDataCenters = []
+      var mapTileData = []
+      Array(fcl * frw * fbr).fill().map((v, i) => {
+        var x = ((i%fcl) -fcl/2 + .5)
+        var y = ((i/fcl/frw|0) - fbr/2 + .5)
+        var z = (((i/fcl)%frw) - frw/2 + .5)
+        mapTileData.push([x, y, z])
+      })
+      var mapTileDataSquare = []
+      Array(4).fill().map((v, i) => {
+        var p, x, y, z
+        p = Math.PI * 2 / 4 * i + Math.PI / 4
+        x = S(p) * 2**.5/2
+        y = C(p) * 2**.5/2
+        z = 0
+        mapTileDataSquare.push([x, y, z])
+        p = Math.PI * 2 / 4 * (i + 1) + Math.PI / 4
+        x = S(p) * 2**.5/2
+        y = C(p) * 2**.5/2
+        z = 0
+        //mapTileDataSquare.push([x, y, z])
+      })
+      
+      var geoOptions = {
+        shapeType: 'dynamic',
+        name: 'map tiles',
+        color: 0x00ff44,
+        colorMix: .5,
+        geometryData: [mapTileDataSquare],
+        //alpha: 1,
+        penumbra: 0,
+        //size: 2,
+        z: -.02,
+      }
+      await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
+        mapTileLines = geometry
+      })  
+
+
+      var scratch    = document.createElement('canvas')
+      var sctx = scratch.getContext('2d', {willReadFrequently: true,
+                                           imageSmoothingEnabled: false,
+                                           antialiasing: false})
+                                           
+      var outputTiles
+      const preAnalyzeMap = async (textureURL, tileNumber = 4) => {
+        await fetch(textureURL).then(res=>res.blob()).then(res => {
+          var img = new Image()
+          img.src = URL.createObjectURL(res)
+          img.onload = async () => {
+            scratch.width  = img.width / 8
+            scratch.height = img.height / 8
+            outputTiles = Array(scratch.width * scratch.height).fill()
+            sctx.drawImage(img, 0, 0, scratch.width, scratch.height)
+            var data = sctx.getImageData(0,0,scratch.width,scratch.height)
+            var l = data.data
+            
+            var bitDepth = 255 / tileNumber * 2.95
+            
+            for(var i = 0; i < l.length; i+=4){
+            
+              var j = i/4
+              var x = j%img.width
+              var y = j/img.width | 0
+              
+              var idx = y * scratch.width + x | 0
+              
+              var red   = l[i+0]
+              var green = l[i+1]
+              var blue  = l[i+2]
+              var alpha = l[i+3]
+              
+              red   = ((red   / (1+bitDepth)) | 0) * bitDepth
+              green = ((green / (1+bitDepth)) | 0) * bitDepth
+              blue  = ((blue  / (1+bitDepth)) | 0) * bitDepth
+              
+              var lum = (red + green + blue) / 3
+              if(lum < 10){
+                red = 255
+                green = 0
+                blue = 0
+              }
+              l[i+0] = red
+              l[i+1] = lum >= 1 ? (blue > 127 ? 0 : green) : 0
+              l[i+2] = lum >= 1 ? blue : 0
+              
+              outputTiles[idx] = Coordinates.HSVFromRGB(red, green, blue)[0] 
+            }
+            
+            sctx.putImageData(data, 0, 0)
+            await loadMap(scratch)
+            //await loadMap(mapTexture)
+          }
+          //img.src = textureURL
+        })
+      }
+
+      await preAnalyzeMap(mapTexture)
+
+      const analyzeMap = (posx, posy) => {
+        if(!mapSubshape?.uvs) return false
+        for(var i = 0; i < mapSubshape.uvs.length; i+=2){
+          var uvx = mapUvs[i+0]
+          var uvy = mapUvs[i+1]
+          
+          uvx += posx / 16666666
+          uvy -= posy / 16666666
+          
+          mapSubshape.uvs[i+0] = uvx
+          mapSubshape.uvs[i+1] = uvy
+        }
+
+
+        var adj = 1.6 / 20
+        Array(fcl*frw*fbr).fill().map((v, j) => {
+          var tx = ((j%fcl)-fcl/2 + .5) * fsp
+          var ty = (((j/fcl|0)%frw)-frw/2 + .5) * fsp
+          var tz = ((j/fcl/frw|0)-fbr/2 + .5) * fsp
+          while(-posx * (16/9) * adj - tx > fsp*fcl/2) tx += fsp*fcl
+          while(-posx * (16/9) * adj - tx < -fsp*fcl/2) tx -= fsp*fcl
+          while(-posy * adj - tz > fsp*fbr/2) tz += fsp*fbr
+          while(-posy * adj - tz < -fsp*fbr/2) tz -= fsp*fbr
+          
+          var nx = -(tx + posx*1 * adj * (16/9)) / fsp
+          var ny = -(tz + posy*1 * adj) /fsp
+          var nz = -.01
+          mapTileLines.x = nx
+          mapTileLines.y = ny //- 6.55 / 2
+          mapTileLines.z = nz
+          
+          var nx = -(tx + posx*0 * adj * (16/9)) / fsp - .5
+          var ny = -(tz + posy*0 * adj) /fsp - .5
+          var nidx = ny * scratch.width / 8 / 4 + nx | 0
+          mapTileLines.color = Coordinates.HSVToHex(outputTiles[nidx], 1, 1)
+          renderer.Draw(mapTileLines)
+        })
+        return true
+      }
+      
+      
+      window.Draw = () => {
+        var t = renderer.t
+        renderer.z = 16
+        if(analyzeMap(C(t) * 2000000, t * 1000000))
+          renderer.Draw(mapSubshape)
+      }
+      
+    </script>
+  </body>
+</html>
