@@ -34,6 +34,7 @@
       
       .toggleToolsButton{
         z-index: 100;
+        cursor: pointer;
         position: absolute;
         display: none;
         max-width: 150px;
@@ -187,7 +188,8 @@
     canvasTexture.height = 400
     var mapShape, mapSubshape, mapShader, mapUvs, mapLines
 
-    var wrapVertical
+    var wrapVertical, mapTileData, mapTileDataCenters
+    var mapTileLines, mapTileDataSquare
     var rotationMode = 3
    
     //var refTexture = 'https://srmcgann.github.io/Coordinates/resources/volcanoes_lowres'
@@ -233,7 +235,7 @@
         {lighting: {type: 'ambientLight', value: 1.25}},
         { uniform: {
           type: 'phong',
-          value: .25
+          value: .75
         } },
         { uniform: {
           type: 'reflection',
@@ -376,7 +378,7 @@
       size:renderer.fov / 6,
       color: 0xffffff,
       alpha: .5,
-      penumbra: .25,
+      penumbra: 0,
     }
     await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
       particlesShape = geometry
@@ -399,7 +401,7 @@
       size:renderer.fov / 60,
       color: 0xffaa66,
       alpha: .5,
-      penumbra: .4,
+      penumbra: 0,
     }
     await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
       smokeParticles = geometry
@@ -487,7 +489,7 @@
         name: 'map coordinates',
         size: 3,
         alpha: .85, 
-        penumbra: .5,
+        penumbra: 0,
         color: 0xff0000,
         z: -.1,
         y: 4.7,
@@ -498,16 +500,17 @@
       })
 
       var geoOptions = {
-        shapeType: 'sprite',
+        shapeType: 'cube',
         z: 0,
         y: 0,
-        subs: 3,
+        x: 0,
+        //subs: 3,
         map: 'https://boss.veriler.com/assets/uploads/1Wf623.png',
         color: 0xffffff,
         colorMix: .001,
         size: 3,
       }
-      await Coordinates.LoadGeometry(mapRenderer, geoOptions).then(async (geometry) => {
+      if(0) await Coordinates.LoadGeometry(mapRenderer, geoOptions).then(async (geometry) => {
         planeIconShape = geometry
         await mapShader.ConnectGeometry(geometry)
       })  
@@ -604,20 +607,59 @@
           })
         break
         case 1:
-          refTexture = 'https://srmcgann.github.io/skyboxes3/HDRI/treehouses.jpg'
+          refTexture = '' //'https://srmcgann.github.io/skyboxes3/HDRI/treehouses.jpg'
           var mapTexture = 'https://bosstools.mooo.com/assets/uploads/1sZamK.jpeg'
           await loadMap(mapTexture)
           splashGraphic = 'https://bosstools.mooo.com/assets/uploads/1cbqzr.jpeg'
-          fcl = 4
+          fcl = 5
           frw = 1
-          fbr = 4
+          fbr = 5
           fsp = 4990 * 2
+          
+          mapTileDataCenters = []
+          mapTileData = []
+          Array(fcl * frw * fbr).fill().map((v, i) => {
+            var x = ((i%fcl) -fcl/2 + .5)
+            var y = ((i/fcl/frw|0) - fbr/2 + .5)
+            var z = (((i/fcl)%frw) - frw/2 + .5)
+            mapTileData.push([x, y, z])
+          })
+          mapTileDataSquare = []
+          Array(4).fill().map((v, i) => {
+            var p, x, y, z
+            p = Math.PI * 2 / 4 * i + Math.PI / 4
+            x = S(p) * 2**.5/2
+            y = C(p) * 2**.5/2
+            z = 0
+            mapTileDataSquare.push([x, y, z])
+            p = Math.PI * 2 / 4 * (i + 1) + Math.PI / 4
+            x = S(p) * 2**.5/2
+            y = C(p) * 2**.5/2
+            z = 0
+            mapTileDataSquare.push([x, y, z])
+          })
+          var geoOptions = {
+            shapeType: 'lines',
+            name: 'map tiles',
+            color: 0x00ff44,
+            colorMix: .5,
+            geometryData: mapTileDataSquare,
+            alpha: 1,
+            z: -2,
+            penumbra: 0,
+            size: 2,
+          }
+          await Coordinates.LoadGeometry(mapRenderer, geoOptions).then(async (geometry) => {
+            mapTileLines = geometry
+          })  
+
           wrapVertical = false
           tiles.push({
             Name: 'blankTile2',
-            URLBase: 'https://srmcgann.github.io/objs/blankFloorTile/blankTile_uvs_fill',
-            URLMap: 'https://boss.veriler.com/assets/uploads/1p8Usg.jpeg',
-            URLHeightMap: 'https://boss.veriler.com/assets/uploads/1zRsMJ.jpeg',
+            //URLBase: 'https://srmcgann.github.io/objs/blankFloorTile/blankTile_uvs_fill',
+            URLBase: 'https://srmcgann.github.io/objs/test_tile',
+            URLMap: '', //'https://boss.veriler.com/assets/uploads/1p8Usg.jpeg',
+            //URLHeightMap: 'https://boss.veriler.com/assets/uploads/1zRsMJ.jpeg',
             HeightmapIntensity: 1e3,
             MaxHeightMap: 1e3,
             ShapeType: 'obj',
@@ -625,14 +667,14 @@
             Freq: fcl*4,
             Equirectangular: false,
             ScaleX: 100,
-            ScaleY: 1,
+            ScaleY: 200,
             ScaleZ: 100,
             ScaleUVX: 1,
             ScaleUVY: 1,
-            Color: 0xffffff,
-            ColorMix: 0,
-            LowpolySuffix: lowpolySuffix,
-            HipolySuffix: hipolySuffix,
+            Color: 0x4400ff,
+            ColorMix: .5,
+            LowpolySuffix: '', //lowpolySuffix,
+            HipolySuffix: '', //hipolySuffix,
             objX: 0, objY: 0, objZ: 0,
             objRoll: 0, objPitch: 0, objYaw: 0,
             randomRoll: false,
@@ -1419,7 +1461,7 @@
     }
     
     var jetRv = .005
-    var jetMv = 1
+    var jetMv = 10
     var keys = Array(256).fill(false)
     var accel = false
     
@@ -1540,9 +1582,9 @@
     }
     
     var maxRotationv = .2
-    var maxSpeedv = 16
-    var maxSpeed = 300
-    var minSpeed = 10
+    var maxSpeedv = 160
+    var maxSpeed = 3000
+    var minSpeed = 0
     const doKeys = () => {
       accel = false
       keys.map((v, idx) => {
@@ -1623,7 +1665,6 @@
               mapSubshape.uvs[i+1] = uvy
             }
             mapRenderer.Draw(mapSubshape)
-            mapRenderer.Draw(planeIconShape)
             
             for(var i = 0; i < mapLines.vertices.length; i += 6){
               var x1 = mapLines.vertices[i+0]
@@ -1659,6 +1700,42 @@
             }
             
             mapRenderer.Draw(mapLines)
+            var adj = 1.6
+            Array(fcl*frw*fbr).fill().map((v, j) => {
+              var tx = ((j%fcl)-fcl/2 + .5) * fsp
+              var ty = (((j/fcl|0)%frw)-frw/2 + .5) * fsp
+              var tz = ((j/fcl/frw|0)-fbr/2 + .5) * fsp
+              while(-renderer.x * (16/9) * adj - tx > fsp*fcl/2) tx += fsp*fcl
+              while(-renderer.x * (16/9) * adj - tx < -fsp*fcl/2) tx -= fsp*fcl
+              while(-renderer.z * adj - tz > fsp*fbr/2) tz += fsp*fbr
+              while(-renderer.z * adj - tz < -fsp*fbr/2) tz -= fsp*fbr
+              
+              var nx = -(tx + renderer.x * adj * (16/9)) / fsp
+              var ny = -(tz + renderer.z * adj) /fsp
+              var nz = -.1
+              mapTileLines.x = nx
+              mapTileLines.y = ny - 6.55 / 2
+              mapTileLines.z = nz
+              mapRenderer.Draw(mapTileLines)
+            })
+            
+            
+            //planeIconShape.x = 0
+            //planeIconShape.y =  - 6.55 / 4
+            //planeIconShape.z =  -4
+            //mapRenderer.Draw(planeIconShape)
+            
+            //mapTileDataSquare
+            //mapTileDataCenters = []
+            
+            
+            
+            //if(wrapVertical){
+            //  while(-renderer.y - ty > fsp*frw/2) ty += fsp*frw
+            //  while(-renderer.y - ty < -fsp*frw/2) ty -= fsp*frw
+            //}
+            
+            
             //renderer.yaw += .001
             //renderer.z = Math.min(70, Math.max(32, (.3+C(t))*150))
             //renderer.pitch = Math.min(.5, Math.max(.1,-(-.3+C(t))*1))
