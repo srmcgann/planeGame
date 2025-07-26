@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Coordinates boilerplate example</title>
+    <style>
+      body, html{
+        background: #333;
+        margin: 0;
+        min-height: 100vh;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module">
+    
+      import * as Coordinates from
+      //"https://srmcgann.github.io/Coordinates/coordinates.min.js"
+      "https://boss.veriler.com/coordinates.js"
+    
+      var rendererOptions = {
+        ambientLight: 1,
+        fov: 1200, margin: 0
+      }
+      var renderer = await Coordinates.Renderer(rendererOptions)
+      
+      
+      Coordinates.AnimationLoop(renderer, 'Draw')
+
+      var shaderOptions = [
+        { uniform: {
+          type: 'phong',
+          value: 0
+        } }
+      ]
+      var shader = await Coordinates.BasicShader(renderer, shaderOptions)
+
+      var rw, cl, dataArray
+      var rw = (2048 * (16/9) * 1 | 0)
+      var cl = 2048 * 1 | 0
+      var dataArray = []
+      for(var i = 0; i < rw * cl; i+=4){
+        var red   = (.5+Math.cos(Math.PI*2/rw*i)/2) * 128 | 0
+        var green = 0
+        var blue  = (.5+Math.sin(Math.PI*2/rw*i)/2) * 128 | 0
+        dataArray.push(red, green, blue, 255)
+      }
+      
+      var S = Math.sin
+      var C = Math.cos
+      var Rn = Math.random
+
+
+      var cubeShape
+      var shapes = []
+      var geoOptions = {
+        shapeType: 'cube',
+        size: 5,
+        color: 0xffffff,
+      }
+      await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
+        cubeShape = geometry
+        await shader.ConnectGeometry(cubeShape)
+      })
+
+      var geoOptions = {
+        shapeType: 'rectangle',
+        name: 'display',
+        map: dataArray,
+        subs: 3,
+        dataArrayWidth: rw/4 | 0,
+        dataArrayHeight: cl/4 | 0 ,
+        scaleX: 16/9,
+        size: 4,
+        colorMix: 0,
+      }
+      await Coordinates.LoadGeometry(renderer, geoOptions).then(async (geometry) => {
+        shapes.push(geometry)
+        await shader.ConnectGeometry(geometry)
+      })
+      
+      
+      console.log(shapes[0])
+      window.Draw = () => {
+        var t = renderer.t
+        renderer.z = 10
+        shapes.forEach(shape => {
+          switch(shape.name){
+            case 'display':
+              for(var m = 9; m--;) if(!((t*60|0)%0)){
+                var testData = Array((16 + (Rn()**21) * 1500)|0).fill().map((v,i)=>[(i+3)**3.1%256, (i+9)**2.6%256, ((i+9)**2.1)%256])
+                Coordinates.ShapeArray.test(renderer,
+                  testData, dataArray, shape.dataArrayWidth,
+                  shape.dataArrayHeight)
+              }
+            break
+          }
+          shape.rebindTextures = true
+          renderer.Draw(shape)
+        })
+      }
+      
+    </script>
+  </body>
+</html>
