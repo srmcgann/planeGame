@@ -1286,16 +1286,16 @@
               mapTexture = 'https://srmcgann.github.io/skyboxes3/HDRI/treehouses.jpg'
               //await loadMap(mapTexture)
               splashGraphic = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
-              fcl = 5
+              fcl = 1
               frw = 1
-              fbr = 5
+              fbr = 1
               fsp = 4990 * 2
 
               wrapVertical = false
-              for(var m = 3; m--;) tiles.push({
+              for(var m = 1; m--;) tiles.push({
                 Name: 'hillHouse' + m,
-                URLBase: 'https://srmcgann.github.io/objs/hillHouse/hillHouse',
-                URLMap: 'https://srmcgann.github.io/objs/hillHouse/hillHouse.jpg',
+                URLBase: 'https://srmcgann.github.io/objs/composite1/composite1',
+                URLMap: 'https://srmcgann.github.io/objs/composite1/composite1.jpg',
                 URLHeightMap: '', //'https://boss.veriler.com/assets/uploads/1zRsMJ.jpeg',
                 //HeightmapIntensity: 1e3,
                 //MaxHeightMap: 1e3,
@@ -1318,6 +1318,7 @@
                 randomPitch: false,
                 randomYaw: true,
               })
+              /*
               tiles.push({
                 Name: 'blankTile',
                 URLBase: 'https://srmcgann.github.io/objs/blankFloorTile/blankTile_uvs_fill',
@@ -1387,6 +1388,7 @@
                 randomPitch: false,
                 randomYaw: false,
               })
+              */
             break
           }
           
