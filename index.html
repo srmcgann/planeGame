@@ -57,7 +57,7 @@
       //"https://srmcgann.github.io/Coordinates/coordinates.min.js"
 
       var rendererOptions = {
-        fov: 1000/1, margin: 0,
+        fov: 1200/1, margin: 0,
         //width: 960, height: 540,
         width: 1920, height: 1080,
       }
@@ -364,14 +364,14 @@
           progressShader = await Coordinates.BasicShader(renderer, shaderOptions)
 
           var shaderOptions = [
-            {lighting: {type: 'ambientLight', value: .4}},
+            {lighting: {type: 'ambientLight', value: 1}},
             { uniform: {
               type: 'phong',
-              value: .5
+              value: .1
             } },
             { uniform: {
               type: 'reflection',
-              value: .2,
+              value: .5,
               enabled: false,
               map: refTexture,
             } },
@@ -1286,15 +1286,15 @@
               mapTexture = 'https://srmcgann.github.io/skyboxes3/HDRI/treehouses.jpg'
               //await loadMap(mapTexture)
               splashGraphic = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
-              fcl = 1
+              fcl = 2
               frw = 1
-              fbr = 1
-              fsp = 4990 * 2
+              fbr = 2
+              fsp = 4990 * 2 * 3
 
               wrapVertical = false
               for(var m = 1; m--;) tiles.push({
                 Name: 'hillHouse' + m,
-                URLBase: 'https://srmcgann.github.io/objs/composite1/composite1',
+                URLBase: 'https://srmcgann.github.io/objs/composite1',
                 URLMap: 'https://srmcgann.github.io/objs/composite1/composite1.jpg',
                 URLHeightMap: '', //'https://boss.veriler.com/assets/uploads/1zRsMJ.jpeg',
                 //HeightmapIntensity: 1e3,
@@ -1309,7 +1309,7 @@
                 ScaleUVX: 1,
                 ScaleUVY: 1,
                 Color: Coordinates.HSVToHex(360-360/2*m, 1, 1),
-                ColorMix: .2,
+                ColorMix: 0,
                 LowpolySuffix: lowpolySuffix,
                 HipolySuffix: hipolySuffix,
                 objX: 0, objY: 0, objZ: 0,
@@ -1389,6 +1389,41 @@
                 randomYaw: false,
               })
               */
+            break
+            case 7:
+              refTexture = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
+              mapTexture = 'https://srmcgann.github.io/skyboxes3/HDRI/treehouses.jpg'
+              splashGraphic = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
+              fcl = 4
+              frw = 1
+              fbr = 4
+              fsp = 499 * 8 * 9
+
+              wrapVertical = false
+              for(var m = 1; m--;) tiles.push({
+                Name: 'hillHouse' + m,
+                URLBase: 'https://boss.veriler.com/test2',
+                URLMap: 'https://boss.veriler.com/test.jpg',
+                URLHeightMap: '', 
+                ShapeType: 'obj',
+                FileExt: 'obj',
+                Freq: 1,
+                Equirectangular: false,
+                ScaleX: 400,
+                ScaleY: 2e3,
+                ScaleZ: 400,
+                ScaleUVX: 1,
+                ScaleUVY: 1,
+                Color: Coordinates.HSVToHex(360-360/2*m, 1, 1),
+                ColorMix: 0,
+                LowpolySuffix: lowpolySuffix,
+                HipolySuffix: hipolySuffix,
+                objX: 0, objY: 0, objZ: 0,
+                objRoll: 0, objPitch: 0, objYaw: 0,
+                randomRoll: false,
+                randomPitch: false,
+                randomYaw: true,
+              })
             break
           }
           
@@ -1501,6 +1536,7 @@
                     }
                     if(tile.Name == 'powerupTile') hasPowerupTiles = true
                     await Coordinates.LoadGeometry(renderer, geoOptions).then(async geometry => {
+                      console.log('loaded geometry: ', geometry)
                       var shape = {}
                       //setTimeout(()=>{geometry.rebindTextures = true}, 3000)
                       shape.name = tile.Name
@@ -1557,8 +1593,8 @@
           })
         }
         
-        var level = 6
-        var levels = 6
+        var level = 7
+        var levels = 7
         var levelLoaded = false
         loadLevel(level)
         
@@ -1803,7 +1839,7 @@
             name: `jet ${idx+1}`,
             shape: jetShapes['_neutral'],//jetShapes[jetType],
             x: 0,
-            y: 3e3,
+            y: 1e3,
             z: 0,
             roll: 0,
             pitch: 0,
@@ -1926,7 +1962,7 @@
         
         const respawn = camID => {
           jets[camID].x = 0
-          jets[camID].y = 3e3
+          jets[camID].y = 1e3
           jets[camID].z = 0
           jets[camID].pitch = 0
           jets[camID].roll = 0
@@ -2292,7 +2328,8 @@
                 shp.geometry.z = cloudTz
                 renderer.Draw(shp.geometry)
               }
-              lod = d >= fsp * 1.5 ? floorTiles[floorIdentities[j]].LowpolySuffix :
+              var d = Math.hypot(-renderer.x - tx, -renderer.y - ty, -renderer.z - tz)
+              lod = d >= fsp * 1 ? floorTiles[floorIdentities[j]].LowpolySuffix :
               floorTiles[floorIdentities[j]].HipolySuffix
               shp = floorTiles.filter(v=>
                 v.roll== floorTiles[floorIdentities[j]].roll &&
