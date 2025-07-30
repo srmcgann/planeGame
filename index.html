@@ -9,7 +9,7 @@
  *  map
  *  map-regions with load-screen & new terrain @ entry
  *  more terrain sets for levels
- *  integrate camera roll & 1st person camera view
+ *  integrate camera roll & 1st person camera visssew
  *  anti-aircraft guns / missiles
  *  plane weaponry
  *  gyroscope / altimiter
@@ -85,7 +85,7 @@
       document.body.appendChild(tools)
       tools.appendChild(mapRenderer.c.parentNode.removeChild(mapRenderer.c))
       
-      var showTools = true, showMap = true
+      var showTools = false, showMap = true
       const toggleToolsVisibility = () => {
         console.log('toggling tools visibility')
         showTools = !showTools
@@ -192,6 +192,8 @@
         var wrapVertical, mapTileData, mapTileDataCenters
         var mapTileLines, mapTileDataSquare, mapTexture
         var rotationMode = 3
+        
+        var fogVal, fogCol
         
         
         var scratch    = document.createElement('canvas')
@@ -375,6 +377,12 @@
               enabled: false,
               map: refTexture,
             } },
+            { uniform: {
+              type: 'fog',
+              value: fogVal,
+              color: fogCol,
+            } },
+            
           ]
           floorShader = await Coordinates.BasicShader(renderer, shaderOptions)
           
@@ -400,6 +408,11 @@
             { uniform: {
               type: 'phong',
               value: 0
+            } },
+            { uniform: {
+              type: 'fog',
+              value: fogVal,
+              color: fogCol,
             } },
           ]
           backgroundShader = await Coordinates.BasicShader(renderer, shaderOptions)
@@ -627,7 +640,7 @@
 
         var floorScaleY = 150, cloudScaleY = 225
         var lod, floorOffset = -1e3
-        var hipolySuffix = '_hipoly'
+        var hipolySuffix = '_lowpoly'
         var lowpolySuffix = '_lowpoly'
         var floorTiles = [], clouds = []
         
@@ -738,13 +751,37 @@
           // floor tiles
           switch(lvl){
             case 0:
-              splashGraphic = 'https://bosstools.mooo.com/assets/uploads/1xBpcm.jpeg'
-              refTexture = 'https://srmcgann.github.io/Coordinates/resources/skymaze_po2.jpg'
-              wrapVertical = false
-              fcl = 1
+              refTexture = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
+              mapTexture = 'https://srmcgann.github.io/skyboxes3/HDRI/treehouses.jpg'
+              splashGraphic = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
+              fcl = 4
               frw = 1
-              fbr = 1
-              fsp = 4990 * 2
+              fbr = 4
+              fsp = 499 * 8 * 9
+              tiles.push({
+                Name: 'mountain tile',
+                URLBase: 'https://srmcgann.github.io/objs/mountain/mountain',
+                URLMap: 'https://srmcgann.github.io/objs/mountain/terrain_textures/1.jpg',
+                ShapeType: 'obj',
+                FileExt: 'obj',
+                Freq: 0,
+                Equirectangular: false,
+                ScaleX: 100,
+                ScaleY: 100,
+                ScaleZ: 100,
+                ScaleUVX: 1,
+                ScaleUVY: 1,
+                Color: 0xffffff,
+                ColorMix: 0,
+                LowpolySuffix: lowpolySuffix,
+                HipolySuffix: hipolySuffix,
+                objX: 0, objY: 0, objZ: 0,
+                objRoll: 0, objPitch: 0, objYaw: 0,
+                randomRoll: false,
+                randomPitch: false,
+                randomYaw: false,
+              })
+              /*
               tiles.push({
                 Name: 'blankTile',
                 URLBase: 'https://srmcgann.github.io/objs/blankFloorTile/blankTile_uvs_fill',
@@ -814,6 +851,7 @@
                 randomPitch: false,
                 randomYaw: false,
               })
+              */
             break
             case 1:
               refTexture = 'https://bosstools.mooo.com/assets/uploads/2cu6Qe.jpeg'
@@ -1394,24 +1432,26 @@
               refTexture = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
               mapTexture = 'https://srmcgann.github.io/skyboxes3/HDRI/treehouses.jpg'
               splashGraphic = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
-              fcl = 4
+              fcl = 3
               frw = 1
-              fbr = 4
-              fsp = 499 * 8 * 9
+              fbr = 3
+              fsp = 4990 * 2
+              fogVal = .007
+              fogCol = 0x4400ff
 
               wrapVertical = false
               for(var m = 1; m--;) tiles.push({
                 Name: 'hillHouse' + m,
-                URLBase: 'https://boss.veriler.com/test2',
-                URLMap: 'https://boss.veriler.com/test.jpg',
+                URLBase: 'https://srmcgann.github.io/objs/new mountain/mountain',
+                URLMap: 'https://srmcgann.github.io/objs/new mountain/terrain_textures/2.jpg',
                 URLHeightMap: '', 
                 ShapeType: 'obj',
                 FileExt: 'obj',
                 Freq: 1,
                 Equirectangular: false,
-                ScaleX: 400,
+                ScaleX: 1e3,
                 ScaleY: 2e3,
-                ScaleZ: 400,
+                ScaleZ: 1e3,
                 ScaleUVX: 1,
                 ScaleUVY: 1,
                 Color: Coordinates.HSVToHex(360-360/2*m, 1, 1),
@@ -1839,7 +1879,7 @@
             name: `jet ${idx+1}`,
             shape: jetShapes['_neutral'],//jetShapes[jetType],
             x: 0,
-            y: 1e3,
+            y: 2e3,
             z: 0,
             roll: 0,
             pitch: 0,
