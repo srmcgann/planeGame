@@ -373,7 +373,7 @@
             } },
             { uniform: {
               type: 'reflection',
-              value: .4,
+              value: .1,
               enabled: true,
               map: refTexture,
             } },
@@ -1430,7 +1430,7 @@
             break
             case 7:
               refTexture = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
-              mapTexture = 'https://boss.veriler.com/assets/uploads/27sfv5.jpeg'
+              mapTexture = 'https://boss.veriler.com/assets/uploads/1WOXOa.jpeg'
               splashGraphic = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
               fcl = 4
               frw = 1
@@ -1497,9 +1497,9 @@
                 FileExt: 'obj',
                 Freq: 1,
                 Equirectangular: false,
-                ScaleX: 8e3/5 * 1.5,
-                ScaleY: 8e3/5 * 1.5,
-                ScaleZ: 8e3/5 * 1.5,
+                ScaleX: 3e3,
+                ScaleY: 3e3,
+                ScaleZ: 3e3,
                 ScaleUVX: 1,
                 ScaleUVY: 1,
                 Color: Coordinates.HSVToHex(360-360/2*m, 1, 1),
@@ -2140,7 +2140,7 @@
             drawProgress(prog)
           }else{
             
-            ;([floorShader, backgroundShader]).forEach(shd => {
+            if(0)([floorShader, backgroundShader]).forEach(shd => {
               shd.datasets.forEach((v, i) => {
                 if(typeof v?.optionalUniforms != 'undefined'){
                   var el = v.optionalUniforms.filter(ou => ou.name == 'fog')
