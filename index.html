@@ -366,14 +366,14 @@
           progressShader = await Coordinates.BasicShader(renderer, shaderOptions)
 
           var shaderOptions = [
-            {lighting: {type: 'ambientLight', value: .75}},
+            {lighting: {type: 'ambientLight', value: .4}},
             { uniform: {
               type: 'phong',
-              value: .3
+              value: .5
             } },
             { uniform: {
               type: 'reflection',
-              value: .1,
+              value: .75,
               enabled: true,
               map: refTexture,
             } },
@@ -640,7 +640,7 @@
 
         var floorScaleY = 150, cloudScaleY = 225
         var lod, floorOffset = -1e3
-        var hipolySuffix = '_lowpoly'
+        var hipolySuffix = '_medpoly'
         var lowpolySuffix = '_lowpoly'
         var floorTiles = [], clouds = []
         
@@ -1436,9 +1436,9 @@
               frw = 1
               fbr = 4
               fsp = 500 * 32 * 1.5
-              fogVal = .002
-              fogCol = 0x110044
-
+              fogVal = .004
+              fogCol = 0x333333
+/*
               wrapVertical = false
               tiles.push({
                 Name: 'terrain1',
@@ -1488,6 +1488,80 @@
                 randomPitch: false,
                 randomYaw: true,
               })
+              */
+              tiles.push({
+                Name: 'terrain3',
+                URLBase: 'https://srmcgann.github.io/objs/terrains/terrain3/terrain3',
+                URLMap: 'https://srmcgann.github.io/objs/terrains/terrain3/terrain3.jpg',
+                URLHeightMap: '', 
+                ShapeType: 'obj',
+                FileExt: 'obj',
+                Freq: 1,
+                Equirectangular: false,
+                ScaleX: 8e3/1 * 1.5,
+                ScaleY: 8e3/1 * 2.5,
+                ScaleZ: 8e3/1 * 1.5,
+                ScaleUVX: 1,
+                ScaleUVY: 1,
+                Color: Coordinates.HSVToHex(360-360/2*m, 1, 1),
+                ColorMix: 0,
+                LowpolySuffix: '',//lowpolySuffix,
+                HipolySuffix: '', //hipolySuffix,
+                objX: 0, objY: 0, objZ: 0,
+                objRoll: 0, objPitch: 0, objYaw: 0,
+                randomRoll: false,
+                randomPitch: false,
+                randomYaw: true,
+              })
+              tiles.push({
+                Name: 'moat',
+                URLBase: 'https://srmcgann.github.io/objs/moat',
+                URLMap: 'https://srmcgann.github.io/objs/terrains/moat/moat.png',
+                URLHeightMap: '', 
+                ShapeType: 'obj',
+                FileExt: 'obj',
+                Freq: 1,
+                Equirectangular: false,
+                ScaleX: 8e3/1 * 1.5,
+                ScaleY: 8e3/1 * 2.5,
+                ScaleZ: 8e3/1 * 1.5,
+                ScaleUVX: 1,
+                ScaleUVY: 1,
+                Color: Coordinates.HSVToHex(360-360/2*m, 1, 1),
+                ColorMix: 0,
+                LowpolySuffix: '',//lowpolySuffix,
+                HipolySuffix: '', //hipolySuffix,
+                objX: 0, objY: 0, objZ: 0,
+                objRoll: 0, objPitch: 0, objYaw: 0,
+                randomRoll: false,
+                randomPitch: false,
+                randomYaw: true,
+              })
+              tiles.push({
+                Name: 'mountain tile',
+                URLBase: 'https://srmcgann.github.io/objs/mountain/mountain',
+                URLMap: 'https://srmcgann.github.io/objs/mountain/terrain_textures/1.jpg',
+                ShapeType: 'obj',
+                FileExt: 'obj',
+                Freq: 1,
+                Equirectangular: false,
+                ScaleX: 245,
+                ScaleY: 100,
+                ScaleZ: 245,
+                ScaleUVX: 1,
+                ScaleUVY: 1,
+                Color: 0xffffff,
+                ColorMix: 0,
+                LowpolySuffix: lowpolySuffix,
+                HipolySuffix: hipolySuffix,
+                objX: 0, objY: 0, objZ: 0,
+                objRoll: 0, objPitch: 0, objYaw: 0,
+                randomRoll: false,
+                randomPitch: false,
+                randomYaw: false,
+              })
+
+              /*
               tiles.push({
                 Name: 'canyon',
                 URLBase: 'https://srmcgann.github.io/objs/terrains/canyon/canyon',
@@ -1512,6 +1586,7 @@
                 randomPitch: false,
                 randomYaw: true,
               })
+              */
             break
           }
           
@@ -1620,6 +1695,8 @@
                       maxHeightmap: tile.MaxHeightmap,
                       color: tile.Color,
                       colorMix: tile.ColorMix,
+                      showNormals:true,
+                      flipNormals:false,
                       //rebindTextures: true,
                     }
                     if(tile.Name == 'powerupTile') hasPowerupTiles = true
@@ -1927,7 +2004,7 @@
             name: `jet ${idx+1}`,
             shape: jetShapes['_neutral'],//jetShapes[jetType],
             x: 0,
-            y: 1e3,
+            y: 3e3,
             z: 0,
             roll: 0,
             pitch: 0,
@@ -1951,7 +2028,7 @@
         }
         
         var jetRv = .005
-        var jetMv = 2
+        var jetMv = 20
         var keys = Array(256).fill(false)
         var accel = false
         
@@ -2050,7 +2127,7 @@
         
         const respawn = camID => {
           jets[camID].x = 0
-          jets[camID].y = 500
+          jets[camID].y = 3e3
           jets[camID].z = 0
           jets[camID].pitch = 0
           jets[camID].roll = 0
@@ -2071,8 +2148,8 @@
         }
         
         var maxRotationv = .2
-        var maxSpeedv = 12
-        var maxSpeed = 500
+        var maxSpeedv = 120
+        var maxSpeed = 5000
         var minSpeed = 0
         const doKeys = () => {
           accel = false
