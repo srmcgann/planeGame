@@ -4,16 +4,15 @@
  ✔ fix smoke particles (sorting)
  ✔ floor collisions
  ✔ levels
- *  method for auto-organizing, adding/removing arbitrary models into single shape
- *  moving clouds
- *  map
- *  map-regions with load-screen & new terrain @ entry
+ ✔  moving clouds
+ ✔  map
+ ✔  map-regions with load-screen & new terrain @ entry
+ ✔  fog or fading @ distance
  *  more terrain sets for levels
- *  integrate camera roll & 1st person camera visssew
+ *  integrate camera roll & 1st person camera view
  *  anti-aircraft guns / missiles
  *  plane weaponry
  *  gyroscope / altimiter
- *  fog or fading @ distance
 -->
 <html>
   <head>
@@ -57,9 +56,9 @@
       //"https://srmcgann.github.io/Coordinates/coordinates.min.js"
 
       var rendererOptions = {
-        fov: 1200/1, margin: 0,
-        //width: 960, height: 540,
-        width: 1920, height: 1080,
+        fov: 1200/2, margin: 0,
+        width: 960, height: 540,
+        //width: 1920, height: 1080,
       }
       var renderer = await Coordinates.Renderer(rendererOptions)
       
@@ -366,14 +365,14 @@
           progressShader = await Coordinates.BasicShader(renderer, shaderOptions)
 
           var shaderOptions = [
-            {lighting: {type: 'ambientLight', value: .4}},
+            {lighting: {type: 'ambientLight', value: .8}},
             { uniform: {
               type: 'phong',
               value: .5
             } },
             { uniform: {
               type: 'reflection',
-              value: .75,
+              value: .1,
               enabled: true,
               map: refTexture,
             } },
@@ -1430,13 +1429,13 @@
             break
             case 7:
               refTexture = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
-              mapTexture = 'https://boss.veriler.com/assets/uploads/1WOXOa.jpeg'
+              mapTexture = 'https://srmcgann.github.io/Coordinates/resources/earth_lowres.jpg'
               splashGraphic = 'https://srmcgann.github.io/Coordinates/resources/pseudoEquirectangular_3.jpg'
-              fcl = 4
+              fcl = 3
               frw = 1
-              fbr = 4
+              fbr = 3
               fsp = 500 * 32 * 1.5
-              fogVal = .004
+              fogVal = .0025
               fogCol = 0x333333
 /*
               wrapVertical = false
@@ -1515,15 +1514,15 @@
               })
               tiles.push({
                 Name: 'moat',
-                URLBase: 'https://srmcgann.github.io/objs/moat',
-                URLMap: 'https://srmcgann.github.io/objs/terrains/moat/moat.png',
+                URLBase: 'https://srmcgann.github.io/objs/terrains/moat/moat',
+                URLMap: 'https://srmcgann.github.io/objs/terrains/moat/moat.jpg',
                 URLHeightMap: '', 
                 ShapeType: 'obj',
                 FileExt: 'obj',
                 Freq: 1,
                 Equirectangular: false,
                 ScaleX: 8e3/1 * 1.5,
-                ScaleY: 8e3/1 * 2.5,
+                ScaleY: 8e3/1 * 1.5,
                 ScaleZ: 8e3/1 * 1.5,
                 ScaleUVX: 1,
                 ScaleUVY: 1,
@@ -1695,8 +1694,8 @@
                       maxHeightmap: tile.MaxHeightmap,
                       color: tile.Color,
                       colorMix: tile.ColorMix,
-                      showNormals:true,
-                      flipNormals:false,
+                      //showNormals:true,
+                      //flipNormals:false,
                       //rebindTextures: true,
                     }
                     if(tile.Name == 'powerupTile') hasPowerupTiles = true
@@ -2028,7 +2027,7 @@
         }
         
         var jetRv = .005
-        var jetMv = 20
+        var jetMv = 1
         var keys = Array(256).fill(false)
         var accel = false
         
@@ -2148,8 +2147,8 @@
         }
         
         var maxRotationv = .2
-        var maxSpeedv = 120
-        var maxSpeed = 5000
+        var maxSpeedv = 6
+        var maxSpeed = 250
         var minSpeed = 0
         const doKeys = () => {
           accel = false
