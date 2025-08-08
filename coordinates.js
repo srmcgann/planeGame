@@ -1216,10 +1216,11 @@ const GeoToOBJ = geo => {
   if(geo?.normalVecs) {
     normals = geo.normalVecs
     //var ct = 0, a = []
+    var l = geo.resolved ? 1: -1
     for(var i = 0; i < normals.length; i += 3) {
-      var nx = -Math.round(normals[i+0]*1e4)/1e4 
-      var ny = Math.round(normals[i+1]*1e4)/1e4 
-      var nz = Math.round(normals[i+2]*1e4)/1e4 
+      var nx = Math.round(normals[i+0]*1e4)/1e4 * l
+      var ny = -Math.round(normals[i+1]*1e4)/1e4 * l
+      var nz = -Math.round(normals[i+2]*1e4)/1e4 * l
       //var x = geo.vertices[i+0]
       //var y = geo.vertices[i+1]
       //var z = geo.vertices[i+2]
@@ -1360,6 +1361,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
   var sphereize                = 0
   var color                    = 0x333333
   var colorMix                 = .1
+  var resolved                 = false // loaded from stock files
   var equirectangular          = -1
   var rotationMode             = 0
   var equirectangularHeightmap = -1
@@ -1554,7 +1556,6 @@ const LoadGeometry = async (renderer, geoOptions) => {
   var normalVecs        = []
 
   var fileURL, hint
-  var resolved          = false
   var resolvedFromCache = false
   
   if(shapeType.indexOf('custom shape') != -1 || (url && shapeType == 'lines')){
@@ -1565,24 +1566,30 @@ const LoadGeometry = async (renderer, geoOptions) => {
     if(subs < 5 && hint){
       var fileBase
       if(1)switch(hint){
+        case 'cylinder_0':
+        case 'cylinder_1':
+        case 'cylinder_2':
+        case 'cylinder_3':
+        case 'torus_0':
+        case 'torus knot_0':
         case 'tetrahedron_0':
         case 'tetrahedron_1':
         case 'tetrahedron_2':
         case 'tetrahedron_3':
         case 'tetrahedron_4':
         case 'tetrahedron_5':
-        case 'cube_0':
-        case 'cube_1':
-        case 'cube_2':
-        case 'cube_3':
-        case 'cube_4':
-        case 'cube_5':
         case 'octahedron_0':
         case 'octahedron_1':
         case 'octahedron_2':
         case 'octahedron_3':
         case 'octahedron_4':
         case 'octahedron_5':
+        case 'cube_0':
+        case 'cube_1':
+        case 'cube_2':
+        case 'cube_3':
+        case 'cube_4':
+        case 'cube_5':
         case 'dodecahedron_0':
         case 'dodecahedron_1':
         case 'dodecahedron_2':
@@ -1595,20 +1602,20 @@ const LoadGeometry = async (renderer, geoOptions) => {
         case 'icosahedron_3':
         case 'icosahedron_4':
         case 'icosahedron_5':
-        case 'cylinder_0':
-        case 'cylinder_1':
-        case 'cylinder_2':
-        case 'cylinder_3':
-        case 'torus_0':
-        case 'torus knot_0':
-          if((hint.indexOf('cylinder') == -1 && hint != 'torus_0') ||
-             (hint.indexOf('cylinder') == -1 && rows == 16 && cols == 40) ||
+          //if(shapeType == 'torus') flipNormals = false//!flipNormals
+          if(sphereize<0){
+            sphereize /= hint.indexOf('tetrahedron') != -1 ? 3 : 1
+            sphereize /= hint.indexOf('octahedron') != -1 ? 2 : 1
+            sphereize /= hint.indexOf('cube') != -1 ? 1.5 : 1
+          }
+          if((hint != 'torus_0') ||
+             (rows == 16 && cols == 40) ||
              (hint == 'torus_0' && rows == 16 && cols == 40) ||
              (hint == 'torus knot_0' && rows == 16 && cols == 40) 
              ){
             resolved = true;
             url = `${ModuleBase}/new%20shapes/`
-            fileURL = `${url}${hint}.json`
+            fileURL = `${url}${hint}.json?3`
             if(involveCache && (cacheItem = cache.geometry.filter(v=>v.url==fileURL)).length){
               console.log(`found geometry (${hint}) in cache... using it`)
               var data          = cacheItem[0].data
@@ -1624,7 +1631,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
                 if(typeof data.normalAssocs != 'undefined') normalAssocs = data.normalAssocs
                 vertices    = data.vertices
                 normals     = data.normals
-                normalVecs  = data.normalVecs
+                normalVecs  = data.normalVecs.map(v=>-v)
                 uvs         = data.uvs
                 cache.geometry.push({data: structuredClone(data), url: fileURL})
               })
@@ -1687,6 +1694,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
   if(!resolved){
     switch(shapeType){
       case 'tetrahedron':
+        sphereize /= sphereize < 0 ? 3 : 1
         if(equirectangular == -1) equirectangular = true
         if(equirectangularHeightmap == -1) equirectangularHeightmap = true
         shape = await Tetrahedron(size, subs, sphereize, flipNormals, shapeType)
@@ -1697,6 +1705,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
         })
       break
       case 'octahedron':
+        sphereize /= sphereize < 0 ? 2 : 1
         if(equirectangular == -1) equirectangular = true
         if(equirectangularHeightmap == -1) equirectangularHeightmap = true
         shape = await Octahedron(size, subs, sphereize, flipNormals, shapeType)
@@ -1784,6 +1793,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
         })
       break
       case 'cube':
+        sphereize /= sphereize < 0 ? 1.5 : 1
         shape = await Cube(size, subs, sphereize, flipNormals, shapeType)
         shape.geometry.map(v => {
           vertices.push(...v.position)
@@ -1908,17 +1918,29 @@ const LoadGeometry = async (renderer, geoOptions) => {
   
   //sphereize
   if(shapeType != 'lines' && shapeType != 'particles' && !isParticle &&
-     shapeType != 'custom shape' && shapeType != 'obj' ||
-     (sphereize || scaleX != 1 || scaleY != 1 || scaleZ != 1)){
+     shapeType != 'custom shape' && shapeType != 'obj' && shapeType != 'dynamic' ||
+     (scaleX != 1 || scaleY != 1 || scaleZ != 1)){
+       // && (sphereize || scaleX != 1 || scaleY != 1 || scaleZ != 1)){
     var ip1 = sphereize
     var ip2 = 1 -sphereize
-    var sz = isParticle || isLine ? 1 : size
+    
+    var maxd = -6e6
     for(var i = 0; i< vertices.length; i+=3){
-      var d, val
+      var d, val, nx, ny, nz
     
       var X = vertices[i+0]
       var Y = vertices[i+1]
       var Z = vertices[i+2]
+      if((d=Math.hypot(X, Y, Z)) > maxd) maxd = d
+    }
+    
+    var maxd2 = -6e6
+    for(var i = 0; i< vertices.length; i+=3){
+      var d, val, nx, ny, nz
+    
+      var X = vertices[i+0] / maxd
+      var Y = vertices[i+1] / maxd
+      var Z = vertices[i+2] / maxd
       d = Math.hypot(X,Y,Z) + .0001
       X /= d
       Y /= d
@@ -1926,9 +1948,18 @@ const LoadGeometry = async (renderer, geoOptions) => {
       X *= ip1 + d*ip2
       Y *= ip1 + d*ip2
       Z *= ip1 + d*ip2
-      vertices[i+0] = X * sz * scaleX
-      vertices[i+1] = Y * sz * scaleY
-      vertices[i+2] = Z * sz * scaleZ
+      vertices[i+0] = X
+      vertices[i+1] = Y
+      vertices[i+2] = Z
+      if((d=Math.hypot(X, Y, Z)) > maxd2) maxd2 = d
+    }
+    for(var i = 0; i < vertices.length; i +=3){
+      vertices[i+0] /= maxd2
+      vertices[i+1] /= maxd2
+      vertices[i+2] /= maxd2
+      vertices[i+0] *= size * scaleX
+      vertices[i+1] *= size * scaleY
+      vertices[i+2] *= size * scaleZ
       
       var ox = normals[i*2+0]
       var oy = normals[i*2+1]
@@ -1947,6 +1978,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
       //normals[i*2+3] *= scaleX
       //normals[i*2+4] *= scaleY
       //normals[i*2+5] *= scaleZ
+      
     }
   }
   
@@ -1956,8 +1988,8 @@ const LoadGeometry = async (renderer, geoOptions) => {
 
   if(shapeType == 'dynamic' || preComputeNormalAssocs) {
     // pre-compute coincidental normals for averaging
-//    var vertices = geometry.vertices
-    //geometry.preComputeNormalAssocs = true
+    // var vertices = geometry.vertices
+    // geometry.preComputeNormalAssocs = true
     normalAssocs = []
     for(var i = 0; i < vertices.length; i+=3){
       var X1 = vertices[i+0]
@@ -1977,7 +2009,8 @@ const LoadGeometry = async (renderer, geoOptions) => {
     }
     //ComputeNormalAssocs(ret)
   }
-    
+
+
   if((shapeType == 'custom shape' || shapeType == 'obj') && 
     (objPitch || objRoll || objYaw || objX || objY || objZ)){
     for(var i = 0; i < vertices.length; i+=3){
@@ -2009,7 +2042,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
     }
   }
   
-  if(shapeType != 'custom shape' &&
+  if(!resolved && shapeType != 'custom shape' &&
     !isParticle && !isLine && !averageNormals &&
      (!resolvedFromCache || !resolved)){
     normalVecs    = []
@@ -2147,7 +2180,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
       processedOutput.normals.push(X1,Y1,Z1, X2,Y2,Z2)
     }
     for(var i = 0; i < normalVecs.length; i++){
-      processedOutput.normalVecs.push((flipNormals ? -1 : 1) * Math.round(normalVecs[i]*1e3) / 1e3)
+      processedOutput.normalVecs.push((flipNormals ? 11 : 1) * Math.round(normalVecs[i]*1e3) / 1e3)
     }
     uvs.map(v => processedOutput.uvs.push(Math.round(v*1e3) / 1e3))
     output.innerHTML = JSON.stringify(processedOutput)
@@ -2312,6 +2345,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
     heightmapIsDataArray, heightmapDataArrayFormat,
     heightmapDataArrayWidth, heightmapDataArrayHeight,
     rebindTextures, exportAsOBJ, downloadAsOBJ,
+    resolved
   }
   Object.keys(updateGeometry).forEach((key, idx) => {
     geometry[key] = updateGeometry[key]
@@ -3045,11 +3079,14 @@ const AverageNormals = (verts, normals, shapeType, normalVecs, flipNormals) => {
     modSrc[i+5] = az /= ct
   }
   modSrc.map((v,i)=>nrmls[i]=v)
+  var flp = shapeType == 'cylinder' || shapeType == 'torus' || shapeType == 'torus knot' ? -1 : 1
   for(var i = 0; i < nrmls.length; i += 6){
-    for(var m=6; m--;) normals[i+m] = nrmls[i+m]
-    for(var m=3; m--;)
-        normalVecs[i/2+m] = -(nrmls[i+3+m] - nrmls[i+m]) * fn
-
+    for(var m=3; m--;) {
+      normals[i+m*2] = nrmls[i+m*2]
+      normals[i+m*2+1] = nrmls[i+m*2] -
+                           (nrmls[i+m*2] + nrmls[i+m*2+1]) * fn // * flp
+        normalVecs[i/2+m] = (nrmls[i+3+m] - nrmls[i+m]) * fn * flp
+    }
   }
 }
 
@@ -3336,7 +3373,7 @@ const BasicShader = async (renderer, options=[]) => {
                       }
 
                       phongP1 = atan(px, pz) + phongTheta;
-                      phongP2 = -acos( py / (.001 + sqrt(px * px + py * py + pz * pz)));
+                      phongP2 = -acos( py / (.001 + sqrt(px * px + py * py + pz * pz)))-.2;
                       
                       //if(refFlipRefs == 1.0) phongP2 = M_PI - phongP2;
 
@@ -5238,7 +5275,7 @@ const subbed = (subs, size, sphereize, shape, texCoords, hint='') => {
     }
   }
 
-  if(sphereize){
+  if(0 && sphereize){
     var d, val
     ip1 = sphereize
     ip2 = 1-sphereize
@@ -5470,7 +5507,7 @@ const Torus = async (size = 1, subs = 0, sphereize = 0, flipNormals=false, shape
       
       ret.push([[X1,Y1,Z1], [X4,Y4,Z4], [X3,Y3,Z3], [X2,Y2,Z2]])
       texCoords.push([[TX1,TY1], [TX2,TY2], [TX3,TY3], [TX4,TY4]])
-          }
+    }
   }
   return GeometryFromRaw(ret, texCoords, size, subs,
                          sphereize, flipNormals, true, shapeType)
@@ -5573,10 +5610,10 @@ const Tetrahedron = async (size = 1, subs = 0, sphereize = 0, flipNormals=false,
   var geometry = []
   var ret = []
   a = []
-  let h = sz/1.4142/1.25
+  let h = sz/1.4142/1.75
   for(i=0;i<3;i++){
-    X = S(p=Math.PI*2/3*i) * sz/1.25
-    Y = C(p) * sz/1.25
+    X = S(p=Math.PI*2/3*i) * sz/1.75
+    Y = C(p) * sz/1.75
     Z = h
     a.push([X,Y,Z])
   }
@@ -5587,12 +5624,12 @@ const Tetrahedron = async (size = 1, subs = 0, sphereize = 0, flipNormals=false,
     Y = 0
     Z = -h
     a.push([X,Y,Z])
-    X = S(p=Math.PI*2/3*j) * sz/1.25
-    Y = C(p) * sz/1.25
+    X = S(p=Math.PI*2/3*j) * sz/1.75
+    Y = C(p) * sz/1.75
     Z = h
     a.push([X,Y,Z])
-    X = S(p=Math.PI*2/3*(j-1)) * sz/1.25
-    Y = C(p) * sz/1.25
+    X = S(p=Math.PI*2/3*(j-1)) * sz/1.75
+    Y = C(p) * sz/1.75
     Z = h
     a.push([X,Y,Z])
     ret.push(a)
@@ -5634,7 +5671,7 @@ const Tetrahedron = async (size = 1, subs = 0, sphereize = 0, flipNormals=false,
     texCoords.push(a)
   }
   
-  return GeometryFromRaw(e, texCoords, size, subs-1,
+  return GeometryFromRaw(e, texCoords, 1, subs,
                          sphereize, flipNormals, false, shapeType)
 }
 
@@ -5643,7 +5680,7 @@ const Octahedron = async (size = 1, subs = 0, sphereize = 0, flipNormals=false, 
   var f, i, j, l, a, b, sz = 1
   var geometry = []
   var ret = []
-  let h = sz/1.25
+  let h = sz/2
   for(j=8;j--;){
     a = []
     X = 0
@@ -5651,21 +5688,21 @@ const Octahedron = async (size = 1, subs = 0, sphereize = 0, flipNormals=false, 
     if(j<4){
       Z = h
       a.push([X,Y,Z])
-      X = S(p=Math.PI*2/4*j) * sz/1.25
-      Y = C(p) * sz/1.25
+      X = S(p=Math.PI*2/4*j) * sz/2
+      Y = C(p) * sz/2
       Z = 0
       a.push([X,Y,Z])
-      X = S(p=Math.PI*2/4*(j+1)) * sz/1.25
-      Y = C(p) * sz/1.25
+      X = S(p=Math.PI*2/4*(j+1)) * sz/2
+      Y = C(p) * sz/2
     }else{
       Z = -h
       a.push([X,Y,Z])
-      X = S(p=Math.PI*2/4*j) * sz/1.25
-      Y = C(p) * sz/1.25
+      X = S(p=Math.PI*2/4*j) * sz/2
+      Y = C(p) * sz/2
       Z = 0
       a.push([X,Y,Z])
-      X = S(p=Math.PI*2/4*(j-1)) * sz/1.25
-      Y = C(p) * sz/1.25
+      X = S(p=Math.PI*2/4*(j-1)) * sz/2
+      Y = C(p) * sz/2
     }
     Z = 0
     a.push([X,Y,Z])
@@ -5689,7 +5726,7 @@ const Octahedron = async (size = 1, subs = 0, sphereize = 0, flipNormals=false, 
     texCoords.push(a)
   }
   
-  return GeometryFromRaw(e, texCoords, size, subs-1,
+  return GeometryFromRaw(e, texCoords, 1, subs,
                          sphereize, flipNormals, false, shapeType)
 }
 
@@ -5770,7 +5807,7 @@ const Icosahedron = async (size = 1, subs = 0, sphereize = 0, flipNormals=false,
     texCoords.push(a)
   }
   
-  return GeometryFromRaw(e, texCoords, 1, subs-1,
+  return GeometryFromRaw(e, texCoords, 1, subs,
                          sphereize, flipNormals, false, shapeType)
 }
 
@@ -6833,6 +6870,24 @@ const getParams = ctx => {
   document.body.appendChild(popup)
 }
 
+const Quat = axis => {
+  var S = Math.sin
+  var C = Math.cos
+  var cosa = C(axis[0]), sina = S(axis[0])
+  var cosb = C(axis[1]), sinb = S(axis[1])
+  var cosc = C(axis[2]), sinc = S(axis[2])
+  var xx = cosa*cosb
+  var xy = cosa*sinb*sinc - sina*cosc
+  var xz = cosa*sinb*cosc + sina*sinc
+  var yx = sina*cosb
+  var yy = sina*sinb*sinc + cosa*cosc
+  var yz = sina*sinb*cosc - cosa*sinc
+  var zx = -sinb
+  var zy = cosb*sinc
+  var zz = cosb*cosc
+  return [xx + xy + xz, yx + yy + yz, zx + zy + zz]
+}
+
 
 const ShapeArray = {
   push: async (renderer, shape) => {
@@ -6983,6 +7038,7 @@ export {
   Reflect,
   Normal,
   BSpline,
+  Quat,
   CurveTo,
   ImageToPo2,
   LoadOBJ,
