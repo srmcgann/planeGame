@@ -213,7 +213,12 @@ const Renderer = async options => {
     var dset   = shader.datasets[geometry.datasetIdx]
     var sProg  = dset.program
     
-    if(geometry.alpha != 1) {
+    if(geometry.alpha != 1 &&
+       !geometry.isLine &&
+       !geometry.isParticle &&
+       !geometry.isLight &&
+       !geometry.isSprite
+       ) {
       ctx.blendFunc(ctx.SRC_ALPHA, ctx.ONE)
       ctx.enable(ctx.BLEND)
       //ctx.disable(ctx.DEPTH_TEST)
@@ -287,9 +292,13 @@ const Renderer = async options => {
             geometry
           }, ...renderer[queueType]]
         }
+        
+        if(geometry.isShapeArray) ProcessShapeArray(geometry)
 
         ctx.useProgram( sProg )
 
+        ctx.texParameteri(ctx.TEXTURE_2D, ctx.TEXTURE_MAG_FILTER,
+          geometry.flatShading ? ctx.NEAREST : ctx.LINEAR);
         for(var m = 0; m < ((equirectangularPlugin && !omitSplitCheck) ? 2 : 1); m++){
           
           // rotation mode
@@ -536,7 +545,11 @@ const Renderer = async options => {
             
             dset.optionalUniforms.map((uniform) => {
               if(typeof uniform?.loc === 'object'){
-                ctx[uniform.dataType](uniform.loc,      uniform.value)
+                if(uniform.dataType == 'uniform4f'){
+                  ctx[uniform.dataType](uniform.loc, ...uniform.value)
+                }else{
+                  ctx[uniform.dataType](uniform.loc, uniform.value)
+                }
                 ctx.uniform1f(uniform.locFlatShading,   uniform.flatShading ? 1.0 : 0.0)
                 switch(uniform.name){
                   case 'fog':
@@ -1324,7 +1337,7 @@ const DownloadCustomShape = geo => {
   var link      = document.createElement('a')
   link.href     = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(object))
   if(!geo.name) geo.name == 'downloadedShape'
-  link.download = geo.name + '.json'
+  link.download = (geo.name ? geo.name : geo.shapeType) + '.json'
   link.click()
 }
 
@@ -1388,6 +1401,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
   var muted                    = true
   var boundingColor            = 0x88ff22
   var showBounding             = false
+  var isShapeArray             = false
   var isSprite                 = 0.0
   var isLight                  = 0.0
   var isParticle               = 0.0
@@ -2355,7 +2369,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
     heightmapIsDataArray, heightmapDataArrayFormat,
     heightmapDataArrayWidth, heightmapDataArrayHeight,
     rebindTextures, exportAsOBJ, downloadAsOBJ,
-    resolved
+    resolved, isShapeArray
   }
   Object.keys(updateGeometry).forEach((key, idx) => {
     geometry[key] = updateGeometry[key]
@@ -2602,9 +2616,9 @@ const BindImage = (gl, resource, binding, textureMode='image', tval=-1, geometry
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    if(geometry.flatShading) gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   
   //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-  //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   //gl.activeTexture(gl.TEXTURE0)
 }
 
@@ -4385,7 +4399,12 @@ const BasicShader = async (renderer, options=[]) => {
               gl.uniform1f(uniform.locFlatShading , uniform.flatShading ? 1.0 : 0.0)
               
               uniform.loc = gl.getUniformLocation(dset.program, uniform.name)
-              gl[uniform.dataType](uniform.loc, uniform.value)
+              console.log(uniform)
+              if(uniform.dataType == 'uniform4f'){
+                gl[uniform.dataType](uniform.loc, ...uniform.value)
+              }else{
+                gl[uniform.dataType](uniform.loc, uniform.value)
+              }
             })
           }
           dset.locColor = gl.getUniformLocation(dset.program, "color")
@@ -4686,16 +4705,92 @@ const BasicShader = async (renderer, options=[]) => {
   return ret
 }
 
+const ProcessShapeArray = shape => {
+  var data = shape.shapeData
+  var nAr = Array(data.length).fill().map(v=>structuredClone(window.Coord_shpArray_memo))
+  var tx, ty, tz, x, y, z, p, d
+  for(var i = 0; i < shape.vertices.length; i += shape.stride){
+    var shpIdx = i/shape.stride
+    if(data[shpIdx].mx != data[shpIdx].x ||
+       data[shpIdx].my != data[shpIdx].y ||
+       data[shpIdx].mz != data[shpIdx].z ||
+       data[shpIdx].mroll != data[shpIdx].roll ||
+       data[shpIdx].mpitch != data[shpIdx].pitch ||
+       data[shpIdx].myaw != data[shpIdx].yaw){
+      tx = data[shpIdx].ox
+      ty = data[shpIdx].oy
+      tz = data[shpIdx].oz
+      for(var k = 0; k < shape.stride; k+=3){
+        for(var m = 2; m--;){
+          var l = m ? 'vstate' : 'nvstate'
+          x = shape[l][i + k + 0] - tx * m
+          y = shape[l][i + k + 1] - ty * m
+          z = shape[l][i + k + 2] - tz * m
+          p = Math.atan2(y, z) + data[shpIdx].pitch
+          d = Math.hypot(y, z)
+          x = x
+          y = S(p) * d
+          z = C(p) * d
+          p = Math.atan2(x, y) + data[shpIdx].roll
+          d = Math.hypot(x, y)
+          x = S(p) * d
+          y = C(p) * d
+          z = z
+          p = Math.atan2(x, z) + data[shpIdx].yaw
+          d = Math.hypot(x, z)
+          x = S(p) * d
+          y = y
+          z = C(p) * d
+          var l = m ? 'vertices' : 'normalVecs'
+          shape[l][i + k + 0] = x + (tx + data[shpIdx].x) * m
+          shape[l][i + k + 1] = y + (ty + data[shpIdx].y) * m
+          shape[l][i + k + 2] = z + (tz + data[shpIdx].z) * m
+          if(shape.showNormals){
+            x = shape.nstate[(i + k) * 2 + 0 + m * 3] - tx
+            y = shape.nstate[(i + k) * 2 + 1 + m * 3] - ty
+            z = shape.nstate[(i + k) * 2 + 2 + m * 3] - tz
+            p = Math.atan2(y, z) + data[shpIdx].pitch
+            d = Math.hypot(y, z)
+            x = x
+            y = S(p) * d
+            z = C(p) * d
+            p = Math.atan2(x, z) + data[shpIdx].yaw
+            d = Math.hypot(x, z)
+            x = S(p) * d
+            y = y
+            z = C(p) * d
+            p = Math.atan2(x, y) + data[shpIdx].roll
+            d = Math.hypot(x, y)
+            x = S(p) * d
+            y = C(p) * d
+            z = z
+            shape.normals[(i + k) * 2 + 0 + m * 3] = x + tx
+            shape.normals[(i + k) * 2 + 1 + m * 3] = y + ty
+            shape.normals[(i + k) * 2 + 2 + m * 3] = z + tz
+          }
+        }
+      }
+      data[shpIdx].mx = data[shpIdx].x
+      data[shpIdx].my = data[shpIdx].y
+      data[shpIdx].mz = data[shpIdx].z
+      data[shpIdx].mroll  = data[shpIdx].roll
+      data[shpIdx].mpitch = data[shpIdx].pitch
+      data[shpIdx].myaw   = data[shpIdx].yaw
+    }
+  }
+}
+
 
 const ShapeFromArray = async (shape, pointArray, options={}) => {
   
   var geometryData = { vertices: [], normals: [], normalVecs: [], uvs: [] }
-  var stride = shape.vertices.length
-  var v      = shape.vertices
-  var n      = shape.normals
-  var uv     = shape.uvs
-  var nv     = shape.normalVecs
-  var stride = shape.vertices.length
+  var stride    = shape.vertices.length
+  var v         = shape.vertices
+  var n         = shape.normals
+  var uv        = shape.uvs
+  var nv        = shape.normalVecs
+  var stride    = shape.vertices.length
+  var shapeData = []
   pointArray.map((par, i) => {
     var tx = par[0]
     var ty = par[1]
@@ -4707,10 +4802,23 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
       if(uv) geometryData.uvs.push(uv[j/3*2+0], tx+uv[j/3*2+1])
       if(nv) geometryData.normalVecs.push(nv[j+0], nv[j+1], nv[j+2])
     }
+    shapeData.push({
+      ox: tx, oy: ty, oz: tz,
+      x:    0, y: 0,     z: 0,
+      roll: 0, pitch: 0, yaw: 0,
+      mx: tx, my: ty, mz: tz,
+      mroll: 0, mpitch: 0, myaw: 0,
+    })
   })
-  var ret, opts = {}
-  
-  var tcan, tshptyp = shape.shapeType
+  if(typeof options?.shapeData != 'undefined') {
+    options.shapeData.forEach((obj, idx) => {
+      Object.keys(obj).forEach((key, val) =>{
+        shapeData[idx][key] = obj[key]
+      })
+    })
+    delete options.shapeData
+  }
+  var tcan, tshptyp = shape.shapeType, ret, opts = { shapeData }
   if(shape.canvasTexture) tcan = shape.canvasTexture
   ;([
     'x', 'y', 'z', 'rows', 'cols', 'size', 'url',
@@ -4731,8 +4839,9 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
     'rebindTextures', 'exportAsOBJ', 'downloadAsOBJ',
     'resolved','map', 'video', 'muted',
   ]).forEach(key => { opts[key] = shape[key] })
-  opts.name = shape.name // + '_array'
+  opts.name = shape.name
   Object.keys(options).forEach((key, idx) => {
+    //if(key != 'shapeData') opts[key] = options[key]
     opts[key] = options[key]
   })
   if(shape.canvasTexture) opts.canvasTexture = shape.canvasTexture
@@ -4746,8 +4855,16 @@ const ShapeFromArray = async (shape, pointArray, options={}) => {
         geometry.uvs[k+1] = shape.uvs[k%shape.uvs.length+1]
       }
     }
-    geometry.shapeType = tshptyp
-    ret = {shape: geometry, stride}
+    
+    geometry.vstate  = structuredClone(geometry.vertices)
+    geometry.nstate  = structuredClone(geometry.normals)
+    geometry.uvs     = structuredClone(geometry.uvs)
+    geometry.nvstate = structuredClone(geometry.normalVecs)
+    
+    geometry.shapeType    = tshptyp
+    geometry.stride       = stride
+    geometry.isShapeArray = true
+    ret = geometry
   })
   return ret
 }
@@ -6204,8 +6321,8 @@ const CurveTo = async (renderer, geoOptions) => {
       Z4 = (Z1 + Z2) / 2
     }
     geoOptions.geometryData = [
-      [X1,Y1,Z1],[X3,Y3,Z3],
-      [X4,Y4,Z4],[X2,Y2,Z2],
+      [X1,-Y1,Z1],[X3,-Y3,Z3],
+      [X4,-Y4,Z4],[X2,-Y2,Z2],
     ]
     await BSpline(renderer, geoOptions).then(res => {
       ret.push(...res.curve)
@@ -7111,6 +7228,7 @@ export {
   PointInPoly3D,
   ShapeToLines,
   ShowBounding,
+  ProcessShapeArray,
   GetShaderCoord,
   Reflect,
   Normal,
