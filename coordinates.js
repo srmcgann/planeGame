@@ -221,9 +221,11 @@ const Renderer = async options => {
        ) {
       ctx.blendFunc(ctx.SRC_ALPHA, ctx.ONE)
       ctx.enable(ctx.BLEND)
-      //ctx.disable(ctx.DEPTH_TEST)
       ctx.enable(ctx.CULL_FACE)
-      ctx.cullFace(ctx.FRONT)
+      if(geometry.alpha == 1) {
+        ctx.disable(ctx.DEPTH_TEST)
+        ctx.cullFace(ctx.FRONT)
+      }
     }else{
       ctx.disable(ctx.CULL_FACE)
       //ctx.disable(ctx.BLEND)
@@ -256,7 +258,7 @@ const Renderer = async options => {
       if(!sortedPass && (geometry.isSprite || (geometry.isLight && geometry.showSource))) {
         var queueType
         switch(geometry.shapeType){
-          case 'sprite'    : case 'point light': queueType = 'alphaQueue'; break
+          case 'sprite'  : case 'point light': queueType = 'alphaQueue'; break
         }
         renderer[queueType] = [{
           x: geometry.x,
@@ -289,6 +291,7 @@ const Renderer = async options => {
             size: geometry.size,
             shapeType: geometry.shapeType,
             vertices: structuredClone(geometry.vertices),
+            //vertices: structuredClone(geometry.vertices),
             geometry
           }, ...renderer[queueType]]
         }
@@ -412,7 +415,6 @@ const Renderer = async options => {
                     tvertices.push(nx, -ny, nz)
                   }
                 }
-                
                 tvertices = new Float32Array(tvertices)
 
                 // vertics, indices
@@ -631,7 +633,6 @@ const Renderer = async options => {
               }
             })
 
-            
             // other uniforms
             ctx.uniform1f(dset.locT,               renderer.t)
             ctx.uniform1f(dset.locIsParticle,      geometry.isParticle)
@@ -686,49 +687,32 @@ const Renderer = async options => {
             
 
             // vertices
+            
             if(geometry?.vertices?.length){
               
               ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.vertex_buffer)
-              if(equirectangularPlugin){
-                var verts =  []
-                for(var i=0; i<geometry.vertices; i+=9){
-                  var X1 = geometry.vertices[i+0]
-                  var Y1 = geometry.vertices[i+1]
-                  var Z1 = geometry.vertices[i+2]
-                  var X2 = geometry.vertices[i+3]
-                  var Y2 = geometry.vertices[i+4]
-                  var Z2 = geometry.vertices[i+5]
-                  var X3 = geometry.vertices[i+6]
-                  var Y3 = geometry.vertices[i+7]
-                  var Z4 = geometry.vertices[i+8]
-                  
-                }
-                ctx.bufferData(ctx.ARRAY_BUFFER, verts, ctx.STATIC_DRAW)
-              }else{
-                ctx.bufferData(ctx.ARRAY_BUFFER, geometry.vertices, ctx.STATIC_DRAW)
-              }
               
               ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.Vertex_Index_Buffer)
               ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.vIndices, ctx.STATIC_DRAW)
               ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.vertex_buffer)
-              ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.Vertex_Index_Buffer)
-              dset.locPosition = ctx.getAttribLocation(dset.program, "position")
+              ctx.bufferData(ctx.ARRAY_BUFFER, geometry.vertices, ctx.STATIC_DRAW)
               ctx.vertexAttribPointer(dset.locPosition, 3, ctx.FLOAT, false, 0, 0)
               ctx.enableVertexAttribArray(dset.locPosition)
+              dset.locNormal = ctx.getAttribLocation(dset.program, "position")
               ctx.drawElements(geometry.wireframe ? ctx.LINE_STRIP :
                                   ctx.TRIANGLES,
                                 geometry.vertices.length/3|0,
                                 ctx.UNSIGNED_INT,0)
-
               ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, null)
               ctx.bindBuffer(ctx.ARRAY_BUFFER, null)
+
             }
 
             // normals lines drawn, optionally
             ctx.uniform1f(dset.locRenderNormals, geometry.showNormals ? 1 : 0)
             if(geometry.showNormals && geometry?.normals?.length){
               ctx.bindBuffer(ctx.ARRAY_BUFFER, geometry.normal_buffer)
-              ctx.bufferData(ctx.ARRAY_BUFFER, geometry.normals, ctx.STATIC_DRAW)
+              //ctx.bufferData(ctx.ARRAY_BUFFER, geometry.normals, ctx.STATIC_DRAW)
               ctx.bindBuffer(ctx.ELEMENT_ARRAY_BUFFER, geometry.Normal_Index_Buffer)
               ctx.bufferData(ctx.ELEMENT_ARRAY_BUFFER, geometry.nIndices, ctx.STATIC_DRAW)
               ctx.vertexAttribPointer(dset.locNormal, 3, ctx.FLOAT, false, 0, 0)
@@ -780,6 +764,8 @@ const ResizeRenderer = (renderer, width, height) => {
     break
     default:
       renderer.ctx.viewport(0, 0, renderer.c.width, renderer.c.height)
+      //Overlay.c.width = renderer.c.width
+      //Overlay.c.height = renderer.c.height
     break
   }
 }
@@ -1060,6 +1046,25 @@ const R_rpy = (X,Y,Z, cam, m=false) => {
   return [X, Y, Z]
 }
 
+const R_ryp = (X,Y,Z, cam, m=false) => {
+  var M = Math, p, d
+  var H=M.hypot, A=M.atan2
+  var Rl = cam.roll, Pt = cam.pitch, Yw = cam.yaw
+  X = S(p=A(X,Y)+Rl)*(d=H(X,Y))
+  Y = C(p)*d
+  X = S(p=A(X,Z)+Yw)*(d=H(X,Z))
+  Z = C(p)*d
+  Y = S(p=A(Y,Z)+Pt)*(d=H(Y,Z))
+  Z = C(p)*d
+  if(m){
+    var oX = cam.x, oY = cam.y, oZ = cam.z
+    X += oX
+    Y += oY
+    Z += oZ
+  }
+  return [X, Y, Z]
+}
+
 
 // load anim frames from zip, expects any file name(s)
 // returns object w/ .geometries, .loaded [true/false], .curFrame [0],
@@ -1314,8 +1319,24 @@ const DownloadCustomShape = geo => {
   for(var i = 0; i< geo.vertices.length; i++)
     vertices.push(Math.round(geo.vertices[i]*1e3)/1e3)
 
-  for(var i = 0; i< geo.uvs.length; i++)
-    uvs.push(Math.round(geo.uvs[i]*1e3)/1e3)
+  if(geo.equirectangular){
+    var d, p, p1, p2, hvx, hvy, hvz
+    for(var i = 0; i< geo.vertices.length; i+=3){
+      hvx = geo.vertices[i+0]
+      hvy = geo.vertices[i+1]
+      hvz = geo.vertices[i+2]
+      d   = Math.hypot(hvx, hvy, hvz) + .0001
+      p   = Math.atan2(hvx, hvz)
+      p1  = p / Math.PI / 2
+      p2  = Math.acos(hvy / d) / Math.PI
+      p1 = Math.round(p1*1e3)/1e3
+      p2 = Math.round(p2*1e3)/1e3
+      uvs.push(p1, p2)
+    }
+  } else {
+    for(var i = 0; i< geo.uvs.length; i++)
+      uvs.push(Math.round(geo.uvs[i]*1e3)/1e3)
+  }
 
   for(var i = 0; i< geo.normals.length; i++)
     normals.push(Math.round(geo.normals[i]*1e3)/1e3)
@@ -1639,7 +1660,7 @@ const LoadGeometry = async (renderer, geoOptions) => {
              ){
             resolved = true;
             url = `${ModuleBase}/new%20shapes/`
-            fileURL = `${url}${hint}.json?3`
+            fileURL = `${url}${hint}.json?4`
             if(involveCache && (cacheItem = cache.geometry.filter(v=>v.url==fileURL)).length){
               console.log(`found geometry (${hint}) in cache... using it`)
               var data          = cacheItem[0].data
@@ -2206,7 +2227,22 @@ const LoadGeometry = async (renderer, geoOptions) => {
     for(var i = 0; i < normalVecs.length; i++){
       processedOutput.normalVecs.push((flipNormals ? 11 : 1) * Math.round(normalVecs[i]*1e3) / 1e3)
     }
-    uvs.map(v => processedOutput.uvs.push(Math.round(v*1e3) / 1e3))
+    if(geometry.equirectangular){
+      for(var i = 0; i< geometry.vertices.length; i+=3){
+        hvx = geometry.vertices[i+0]
+        hvy = geometry.vertices[i+1]
+        hvz = geometry.vertices[i+2]
+        d   = Math.hypot(hvx, hvy, hvz) + .0001
+        p   = Math.atan2(hvx, hvz)
+        p1  = p / Math.PI / 2
+        p2  = Math.acos(hvy / d) / Math.PI
+        p1 = Math.round(p1*1e3)/1e3
+        p2 = Math.round(p2*1e3)/1e3
+        uvs.push(p1, p2)
+      }
+    }else{
+      uvs.map(v => processedOutput.uvs.push(Math.round(v*1e3) / 1e3))
+    }
     output.innerHTML = JSON.stringify(processedOutput)
     document.body.appendChild(popup)
   }
@@ -2738,14 +2774,14 @@ const GetShaderCoord = (vx, vy, vz, geometry, renderer,
   
   vy *= -1
   
-  ar = R_ypr(vx, vy, vz, {
+  ar = R_ryp(vx, vy, vz, {
     roll:  -geometry.roll + .0001,
-    pitch: -geometry.pitch,
-    yaw:   geometry.yaw,
+    pitch: geometry.pitch,
+    yaw:   -geometry.yaw,
   }, false)
   vx = ar[0]
   vy = ar[1]
-  vz = ar[2]
+  vz = -ar[2]
 
   if(geometry.isLight){
     ar = R_rpy(vx, vy, vz, {
@@ -2759,39 +2795,39 @@ const GetShaderCoord = (vx, vy, vz, geometry, renderer,
   }
 
   var cpx = renderer.x
-  var cpy = -renderer.y
+  var cpy = renderer.y
   var cpz = renderer.z
 
-  vx += geometry.x
+  vx += -geometry.x
   vy += geometry.y
-  vz += geometry.z
+  vz += -geometry.z
   var posx, posy, posz
   if(renderer.cameraMode.toLowerCase() == 'fps'){
-    vx += cpx
+    vx += -cpx
     vy += cpy
-    vz += cpz
+    vz += -cpz
     
     ar = R_ypr(vx, vy, vz, {
-      roll: -renderer.roll,
+      roll: renderer.roll,
       pitch: -renderer.pitch,
       yaw: renderer.yaw,
     }, false)
-    vx = ar[0]
-    vy = ar[1]
-    vz = ar[2]
+    vx = -ar[0]
+    vy = -ar[1]
+    vz = -ar[2]
 
     cpx = 0
     cpy = 0
     cpz = 0
   }else{
-    ar = R_ypr(vx, vy, vz, {
-      roll: -renderer.roll,
-      pitch: -renderer.pitch,
-      yaw: renderer.yaw,
+    ar = R_ryp(vx, vy, vz, {
+      roll: -renderer.roll * (geometry.isParticle ? -1: 1),
+      pitch: renderer.pitch, //* (geometry.isParticle ? -1: 1),
+      yaw: renderer.yaw * (geometry.isParticle ? -1: 1),
     }, false)
-    vx = ar[0]
-    vy = ar[1]
-    vz = ar[2]
+    vx = -ar[0] * (geometry.isParticle ? -1: 1)
+    vy = -ar[1] //* (geometry.isParticle ? -1: 1)
+    vz = -ar[2] //* (geometry.isParticle ? -1: 1)
   }
   
   posx = vx
@@ -2853,7 +2889,8 @@ const GetShaderCoord = (vx, vy, vz, geometry, renderer,
 
 const ShowBounding = (shape, renderer, draw=true,
                       equirectangularPlugin=-1,
-                      omitSplitCheck=true, splitCheckPass=0) => {
+                      omitSplitCheck=true, splitCheckPass=0,
+                      lw = 10) => {
                         
   if(equirectangularPlugin == -1){
     equirectangularPlugin = renderer.equirectangularPlugin
@@ -2888,7 +2925,7 @@ const ShowBounding = (shape, renderer, draw=true,
     })
     
     if(tidx == -9) return
-    if(draw) pts.push(...ar[tidx])
+    if(draw) pts.push(ar[tidx])
     recurse(ar, tidx, oidx, maxp)
   }
 
@@ -2937,7 +2974,7 @@ const ShowBounding = (shape, renderer, draw=true,
          (!shape.isLine && (shape.isParticle || i%9 == 6))){
         ax /= sd
         ay /= sd
-        if(Math.hypot(ax-ox, ay-oy) > 10){
+        if(Math.hypot(ax-ox, ay-oy) > 2){
           ox = ax
           oy = ay
           a.push( b )
@@ -3009,13 +3046,13 @@ const ShowBounding = (shape, renderer, draw=true,
       Overlay.ctx.globalAlpha = 1
       Overlay.ctx.beginPath()
       pts.map((v, i) => {
-        Overlay.ctx.lineWidth = 10
+        Overlay.ctx.lineWidth = lw
         var lx1 = pts[i][0]
         var ly1 = pts[i][1]
         var lx2 = pts[l=(i+1)%pts.length][0]
         var ly2 = pts[l][1]
         if(omitSplitCheck){
-          Overlay.ctx.moveTo(lx1, ly1)
+          //Overlay.ctx.moveTo(lx1, ly1)
           Overlay.ctx.lineTo(lx2, ly2)
         }else{
           if(splitCheckPass == 0){
@@ -3037,6 +3074,7 @@ const ShowBounding = (shape, renderer, draw=true,
           }
         }
       })
+      Overlay.ctx.closePath()
       Overlay.ctx.stroke()
     }
   }
@@ -4399,7 +4437,6 @@ const BasicShader = async (renderer, options=[]) => {
               gl.uniform1f(uniform.locFlatShading , uniform.flatShading ? 1.0 : 0.0)
               
               uniform.loc = gl.getUniformLocation(dset.program, uniform.name)
-              console.log(uniform)
               if(uniform.dataType == 'uniform4f'){
                 gl[uniform.dataType](uniform.loc, ...uniform.value)
               }else{
@@ -6839,14 +6876,7 @@ const AnimationLoop = (renderer, func) => {
                                     renderer.y + vec[1],
                                     renderer.z + vec[2]) })
         })
-        switch(renderer.cameraMode){
-          case 'fps':
-            forSort.sort((a, b) => b.z - a.z)
-          break
-          case 'fps':
-            forSort.sort((a, b) => a.z - b.z)
-          break
-        }
+        forSort.sort((a, b) => b.z - a.z)
         renderer[queueType].map(async (alphaShape, idx) => {
 
 
@@ -6929,6 +6959,72 @@ const HSVFromRGB = (R, G, B) => {
   while(hue<0) hue+=360;
   while(hue>=360) hue-=360;
   return [hue, sat, val]
+}
+
+const ShiftArray = (ar, dir) => {
+  var ret = Array(ar.length).fill()
+  for(var i = 0; i < ar.length; i++){
+    var x = i%ar.length
+    switch(dir){
+      case 'left': x--; break
+      case 'right': x++; break
+    }
+    if(x < 0) x = width - 1
+    x %= width
+    var nidx = x
+    ret[i] = ar[nidx]
+  }
+  for(var i = 0; i < ar.length; i++) ar[i] = ret[i]
+  return ret
+}
+
+const ShiftArray2D = (ar, dir, width) => {
+  var ret = Array(ar.length).fill()
+  for(var i = 0; i < ar.length; i++){
+    var x = i%width
+    var y = i/width |0
+    switch(dir){
+      case 'left': x--; break
+      case 'up': y++; break
+      case 'right': x++; break
+      case 'down': y--; break
+    }
+    if(x < 0) x = width - 1
+    if(y < 0) y += ar.length / width | 0
+    x %= width
+    y %= ar.length / width | 0
+    var nidx = x + y * width
+    ret[i] = ar[nidx]
+  }
+  for(var i = 0; i < ar.length; i++) ar[i] = ret[i]
+  return ret
+}
+
+const ShiftArray3D = (ar, dir, width, height) => {
+  var ret = Array(ar.length).fill()
+  for(var i = 0; i < ar.length; i++){
+    var x = i%width
+    var y = (i/width |0) % height
+    var z = i/width/height |0
+    switch(dir){
+      case 'left': x--; break
+      case 'up': y++; break
+      case 'right': x++; break
+      case 'down': y--; break
+      case 'forward': z++; break
+      case 'backward': z--; break
+    }
+    if(x < 0) x = width - 1
+    if(y < 0) y += height
+    if(z < 0) z += ar.length / width / height | 0
+    x %= width
+    y %= height
+    z %= ar.length / width / height | 0
+    var nidx = x + y * width + z * width * height
+    ret[i] = ar[nidx]
+  }
+  for(var i = 0; i < ar.length; i++) ar[i] = ret[i]
+  return ret
 }
 
 const IsArray = ar => typeof ar.length != 'undefined' && typeof ar.forEach != 'undefined'
@@ -7235,6 +7331,9 @@ export {
   BSpline,
   Quat,
   CurveTo,
+  ShiftArray,
+  ShiftArray2D,
+  ShiftArray3D,
   ImageToPo2,
   LoadOBJ,
   IsPowerOf2,
