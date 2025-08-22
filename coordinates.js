@@ -570,6 +570,7 @@ const Renderer = async options => {
                     }
                     ctx.activeTexture(ctx.TEXTURE1)
                     ctx.uniform1i(uniform.locRefTexture, 1)
+                    ctx.uniform1f(uniform.locRefTheta, uniform.theta)
                     ctx.bindTexture(ctx.TEXTURE_2D, uniform.refTexture)
                     
                     ctx.uniform1f(uniform.locRefOmitEquirectangular,
@@ -1327,6 +1328,12 @@ const DownloadCustomShape = geo => {
       hvz = geo.vertices[i+2]
       d   = Math.hypot(hvx, hvy, hvz) + .0001
       p   = Math.atan2(hvx, hvz)
+      for(var m = 0; m < (i%9)/3|0; m++){
+        var test = uvs[(i/3|0)*2-(2+m*2)] * 2 * Math.PI
+        if(Math.abs(test - p) > Math.PI) {
+          p += (p < test ? 1 : -1) * Math.PI*2
+        }
+      }
       p1  = p / Math.PI / 2
       p2  = Math.acos(hvy / d) / Math.PI
       p1 = Math.round(p1*1e3)/1e3
@@ -1581,8 +1588,8 @@ const LoadGeometry = async (renderer, geoOptions) => {
   if(geoOptions.heightMapIsCanvas){
     tempCanvas2 = geoOptions.heightMap
     delete geoOptions.heightMap
+    if(geoOptions?.heightmap) delete geoOptions.heightmap
   }
-
   geoOptions = structuredClone(geoOptions)
 
   if(typeof tempCanvas1 != 'undefined'){
@@ -2234,6 +2241,12 @@ const LoadGeometry = async (renderer, geoOptions) => {
         hvz = geometry.vertices[i+2]
         d   = Math.hypot(hvx, hvy, hvz) + .0001
         p   = Math.atan2(hvx, hvz)
+        for(var m = 0; m < (i%9)/3|0; m++){
+          var test = uvs[(i/3|0)*2-(2+m*2)] * 2 * Math.PI
+          if(Math.abs(test - p) > Math.PI) {
+            p += (p < test ? 1 : -1) * Math.PI*2
+          }
+        }
         p1  = p / Math.PI / 2
         p2  = Math.acos(hvy / d) / Math.PI
         p1 = Math.round(p1*1e3)/1e3
@@ -2901,7 +2914,7 @@ const ShowBounding = (shape, renderer, draw=true,
   var X, Y, Z
   
   var X1, Y1, X2, Y2, X3, Y3, X4, Y4
-  var p, d, a, b, maxp, tidx, tpart, mind
+  var p, d, a, b, maxp, tidx, tpart, mind, p3
   var memo=[]
   var pts = []
   const recurse = (ar, idx, oidx=-1, op=9) => {
@@ -2915,11 +2928,13 @@ const ShowBounding = (shape, renderer, draw=true,
     maxp = tidx = -9
     ar.map((v, i) =>{
       if(i!=idx){
-        X2 = ar[i][0]
-        Y2 = ar[i][1]
-        if((p = Math.atan2(Y2-Y1-.00001, X1-X2)) >= maxp && p <= op){
-          maxp = p
-          tidx = i
+        for(var m = 4; m--; ){
+          X2 = ar[i][0] + S(p3=Math.PI*2/4*m+Math.PI/4) * .001
+          Y2 = ar[i][1] + C(p3) * .001
+          if((p = Math.atan2(Y2-Y1, X1-X2)) > maxp && p < op){
+            maxp = p
+            tidx = i
+          }
         }
       }
     })
@@ -2930,7 +2945,7 @@ const ShowBounding = (shape, renderer, draw=true,
   }
 
   var a     = [], b, p, ox=-1, oy=1e6, ax, ay, nx, ny, nz, uvx, uvy
-  var sd    = 3
+  var sd    = 3 //shape.isLine ? 6 : 3
   var dset  = shape.shader.datasets[shape.datasetIdx]
 
   if(shape.heightMap){
@@ -2946,8 +2961,8 @@ const ShowBounding = (shape, renderer, draw=true,
   }
   
   for(var i=0; i<shape.vertices.length; i+=sd){
-    if(shape.isLine && !(i%2) ||
-      (!shape.isLine && (shape.isParticle || !(i%9)))){
+    if(shape.isLine ||
+      (!shape.isLine && (shape.isParticle || !((i/sd|0)%3)))){
       ax = ay = 0
       //Overlay.ctx.beginPath()
       b = []
@@ -2970,15 +2985,15 @@ const ShowBounding = (shape, renderer, draw=true,
       ax += ar[0]
       ay += ar[1]
       
-      if(shape.isLine && i%9 == 3 ||
-         (!shape.isLine && (shape.isParticle || i%9 == 6))){
+      if(1||shape.isLine ||
+         (!shape.isLine && (shape.isParticle || (i/sd|0)%3 == 2))){
         ax /= sd
         ay /= sd
-        if(Math.hypot(ax-ox, ay-oy) > 2){
+        //if(Math.hypot(ax-ox, ay-oy) > 10){
           ox = ax
           oy = ay
           a.push( b )
-        }
+        //}
       }
       //if(ar.length){
         //Overlay.ctx.lineTo(...ar)
@@ -3263,8 +3278,8 @@ const BasicShader = async (renderer, options=[]) => {
                                          .5 : option[key].value,
                   flatShading:         typeof option[key].flatShading == 'undefined' ?
                                          false : option[key].flatShading,
-                  flipReflections:     typeof option[key].flipReflections == 'undefined' ?
-                                         0 : option[key].flipReflections,
+                  flipReflections:     typeof option[key].flipReflections == 'undefined' ? 0 : option[key].flipReflections,
+                  theta:               typeof option[key].theta == 'undefined' ?0:option[key].theta,
                   flatShadingUniform:  'refFlatShading',
                   dataType:            'uniform1f',
                   vertDeclaration:     `
@@ -3274,6 +3289,7 @@ const BasicShader = async (renderer, options=[]) => {
                   fragDeclaration:     `
                     uniform float reflection;
                     uniform float refFlatShading;
+                    uniform float refTheta;
                     uniform float refOmitEquirectangular;
                     uniform float refFlipRefs;
                     uniform sampler2D reflectionMap;
@@ -3296,8 +3312,8 @@ const BasicShader = async (renderer, options=[]) => {
                       refP2 = vUv.y;
                     }
                     
-                    vec2 refCoords = vec2(1.0 - refP1 * 2.0, refP2);
-                    vec4 refCol = vec4(texture2D(reflectionMap, vec2(refCoords.x, refCoords.y)).rgb * 1.25, reflection / 1.0);
+                    vec2 refCoords = vec2(1.0 - refP1 * 2.0 + refTheta, refP2);
+                    vec4 refCol = vec4(texture2D(reflectionMap, refCoords).rgb * 1.25, reflection / 1.0);
                     mixColor = merge(mixColor, refCol);
                     baseColorIp = 1.0 - reflection; //min(1.0, 2.0 - reflection);
                     //light += reflection / 4.0;
@@ -3809,7 +3825,7 @@ const BasicShader = async (renderer, options=[]) => {
             if(Z > 0.0) {
               gl_PointSize = 100.0 * pointSize / Z;
               gl_Position = vec4(X, Y, Z/10000.0, 1.0);
-              depth = pow(1.0 + sqrt(X*X + Y*Y + Z*Z), 1.0) / 100.0;
+              depth = pow(1.0 + sqrt(X*X + Y*Y + Z*Z), 1.25) / 500.0;
               skip = 0.0;
               vUv = uv;
             }else{
@@ -4167,6 +4183,7 @@ const BasicShader = async (renderer, options=[]) => {
                     let l
                     let suffix = (l=url.split('.'))[l.length-1].toLowerCase()
                     uniform.refTexture = gl.createTexture()
+                    uniform.locRefTheta = gl.getUniformLocation(dset.program, "refTheta")
                     switch(suffix){
                       case 'mp4': case 'webm': case 'avi': case 'mkv': case 'ogv':
                         uniform.textureMode = 'video'
